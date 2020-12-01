@@ -1,0 +1,650 @@
+---
+title: 'Actividad 3 y 4: Contagios por Movimiento Aleatorio'
+author: "A. Aguilar, R. Aguirre, J. Chávez, E. Galarza"
+date: "30 de Noviembre de 2020"
+output:
+  html_document:
+    df_print: paged
+---
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(stringi)
+library(plotly)
+```
+## Fase 3: Simulación de la geometría de ciudad y estructura de datos para las personas
+*Problema 1 -A00827217:*
+* Crear   una   ciudad   cuadrada   donde   cada   lado   tiene   tamaño *D* con distribución uniforme de personas.
+
+  Se definió una población de 500 individuos, es decir, $N = 500$. La ciudad se encuentra modela por un cuadrando de 10 unidades de lado, teniendo $100 u^2$ de área.
+
+
+* Crear  un  arreglo  de posiciones x, y  de posiciones y considerando *N* personas. Asignar una posición inicial para cada una de las personas de la población  por  medio  de un  número aleatorio  uniforme.
+
+  Se considero un arreglo de coordenadas $(x,y)$ definidas en en intervalo [D,D].
+```{r}
+  #Definimos al número N de personas a considerar
+  N = 500
+  x <- c(runif(N, min=0, max=10))
+  y <- c(runif(N,min=0,max=10))
+  coordenadas <- data.frame(x,y)
+  
+  f <- stri_rand_strings(N, 5)
+  
+  #Graficamos la distibución de las personas en la ciudad
+  plot(coordenadas,
+  main = "Distribución de las personas en la ciudad",
+  xlab = "D",
+  ylab = "D")
+  
+  #Añadimos un ID diferente a cada persona
+  coordenadas <- tibble::rowid_to_column(coordenadas, "ID")
+
+```
+### Problema 1.1
+Dado  un  valor  inicial  de N,  crear 3 variables  para  contar  el  número  inicial de infectados, de susceptibles y de recuperados. Las variables deben ser tales que $N=I+S+R$ y que haya por lo menos una persona infectada.Inicialmente no hay recuperados $(R=0)$.
+```{r}
+  #Definimos quienes son nuestras variables. Cumpliendo que N = I + S + R. 
+  S <- 498
+  I <- 1
+  R <- 1
+  N <- S + R + I
+```
+### Problema 1.2
+Crear 2 variables  para  definir el \textbf{“radio”}  de  infección $r$,  que  representará la distancia para poderse infectar,$r=0.6$,y para la razón de recuperación.
+```{r}
+  #Ratio de contagio
+  r <- 0.6
+  #Ratio de recuperación. USando la propuesta en modelos anteriores.
+  gama <- 0.3
+```
+### Problema 1.3
+Crear una variable categórica (factor variable) que represente el estado de la
+persona (suceptible, infectada o recuperada).
+```{r}
+  #Creamos la variable categorica de estado. Asignamos la infección de forma al azar. 
+  estado <- ifelse(coordenadas$ID == sample(1:N,I),'infectado','susceptible')
+  #Indexamos la variable a nuestro dataframe
+  coordenadas$Estado <- estado
+  #Asignamos a nuestro primer recuperado
+  coordenadas[sample(1:N,I),4]='recuperado'
+  
+```
+### Problema 1.4
+Escribir una función que revise la distancia euclidiana entre dos puntos y regrese
+TRUE (o 1) si la distancia es menor que r y regrese FALSE (o 0) si la distancia
+es mayor o igual que r.
+
+Para esta función se utiliza la deducción de la \textbf{"distancia euclidiana"} que se obtiene del Teorema de Pitágoras.
+```{r}
+  #Función que calcula si la distancia euclidia entre 2 puntos coordenados (x,y) es    menor que el ratio de contagio r.
+  distancia_euclidia <- function(x1,y1,x2,y2){
+    distancia <- sqrt((x2-x1)^2 + (y2-y1)^2)
+    if (distancia <= r){
+      return(TRUE)
+    }else{
+        return(FALSE)
+      }
+  }
+```
+
+## Fase 4: Iteración, movimiento y representación gráfica.
+*Problema 1 -A00827217:*
+
+```{r}
+#Hacemos una copia de las coordenadas iniciales.Iremos concatenando los nuevos datos a este dataframe.
+coordenadas2 <- coordenadas
+   
+#modificaciones a lo yolo
+coordenadas2$I <- rep(0,nrow(coordenadas))
+
+#Rratio <- runif(nrow(coordenadas))
+#coordenadas$ratio <-Rratio
+tiempo <- c(1:10)
+
+for (i in tiempo){
+
+   
+   #Creamos dos vectores de tamaño N con los desplazamientos
+   x1 <- c(runif(N, min=0, max=10))
+   y1 <- c(runif(N,min=0,max=10))
+   
+   #Asignamos números aleatorios a cada contagiado.
+   #Rratio <- runif(nrow(coordenadas))
+   #coordenadas$ratio <-Rratio
+   
+   
+   #Checar quienes están infectados
+   
+   inf = subset(coordenadas, Estado == 'infectado')
+   sus = subset(coordenadas, Estado == 'susceptible')
+   recu = subset(coordenadas, Estado == 'recuperado')
+   
+  
+   #Método de contagio
+   for (k in (1:nrow(inf))){
+      x0 <- inf[k,2]
+      y0 <- inf[k,3]
+      for (j in (1:nrow(coordenadas))){
+        t <- distancia_euclidia(coordenadas[j,2],coordenadas[j,3],x0,y0)
+        if(t == TRUE){
+          coordenadas[j,4]='infectado'
+        }
+      }
+   }
+   Rratio <- runif(nrow(inf))
+   inf$ratio <-Rratio
+   
+   #Método de recuperación
+    for (v in (1:nrow(inf))){
+        ratio_t <- inf[v,5]
+       if (ratio_t <= gama){
+         id <- inf[v,1]
+         coordenadas[id,4] = 'recuperado'
+       }
+     }
+   
+   coordenadas$x <- x1
+   coordenadas$y <- y1
+   coordenadas$ratio <- NULL
+   coordenadas$I <- rep(i,nrow(coordenadas))
+   coordenadas2 <- rbind(coordenadas2,coordenadas)
+   coordenadas$I <- NULL
+   }
+```
+### Animación
+```{r}
+fig <- coordenadas2 %>%
+  plot_ly(
+    x = ~x, 
+    y = ~y, 
+    color = ~Estado, 
+    frame = ~I, 
+    type = 'scatter',
+    mode = 'markers',
+    text = ~ID, 
+    hoverinfo = "text"
+  )
+fig <- fig %>%
+  animation_opts(
+    1000, easing = "elastic", redraw = FALSE
+  )
+fig
+```
+
+```{r setup2, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(stringi)
+library(plotly)
+```
+
+## Fase 3: Simulación de la geometría de ciudad y estructura de datos para las personas
+*Problema 2 -A01235869:*
+
+* Crear una ciudad circular de radio D/2 con distribución uniforme de
+personas.
+
+*Crear un arreglo de posiciones x, y de posiciones y considerando N
+personas. Asignar una posición inicial aleatoria para cada una de las
+personas de la población.
+
+```{r}
+library(ggplot2)
+#Fase 3 Circulo con radio D/2
+N = 500
+D = 10 
+Radio = D/2
+r = 0.6
+
+#Punto aleatorio en círculo
+a = runif(N,1,10)*2*pi
+rr = Radio*sqrt(runif(N))
+x = rr*cos(a) #Cambio a coordenadas polares para x
+y = rr*sin(a) #Cambio a coordenadas polares para y
+coordenadas <- data.frame(x,y)
+
+f <- stri_rand_strings(N, 5)
+
+#Graficamos la distibución de las personas en la ciudad
+plot(coordenadas,main = "Distribución de las personas en la ciudad",
+xlab = "D",
+ylab = "D", asp = 1, xlim = c(-Radio, Radio),ylim = c(-Radio, Radio))
+
+#Añadimos un ID diferente a cada persona
+coordenadas <- tibble::rowid_to_column(coordenadas, "ID")
+
+#Hacer Circulo
+t <- seq(0, 2*pi, length.out = 1000) ## usaré más valores
+ 
+radio = Radio
+ 
+origenx <- 0 ## origen circunferencia eje x
+origeny <- 0 ## origen circunferencia eje y
+ 
+xcirc <- origenx + cos(t)*radio
+ycirc <- origeny + sin(t)*radio
+
+lines(xcirc, ycirc, lwd=1)
+```
+
+## Fase 4: Iteración, movimiento y representación gráfica.
+*Problema 2 -A01235869:*
+
+```{r}
+  #Definimos quienes son nuestras variables. Cumpliendo que N = I + S + R. 
+  S <- 498
+  I <- 1
+  R <- 1
+  N <- S + R + I
+```
+```{r}
+  #Ratio de contagio
+  r <- 0.6
+  #Ratio de recuperación. USando la propuesta en modelos anteriores.
+  gama <- 0.3
+```
+```{r}
+  #Creamos la variable categorica de estado. Asignamos la infección de forma al azar. 
+  estado <- ifelse(coordenadas$ID == sample(1:N,I),'infectado','susceptible')
+  #Indexamos la variable a nuestro dataframe
+  coordenadas$Estado <- estado
+  #Asignamos a nuestro primer recuperado
+  coordenadas[sample(1:N,I),4]='recuperado'
+  
+```
+```{r}
+  #Función que calcula si la distancia euclidia entre 2 puntos coordenados (x,y) es    menor que el ratio de contagio r.
+  distancia_euclidia <- function(x1,y1,x2,y2){
+    distancia <- sqrt((x2-x1)^2 + (y2-y1)^2)
+    if (distancia <= r){
+      return(TRUE)
+    }else{
+        return(FALSE)
+      }
+  }
+```
+```{r}
+#Hacemos una copia de las coordenadas iniciales.Iremos concatenando los nuevos datos a este dataframe.
+coordenadas2 <- coordenadas
+   
+#modificaciones a lo yolo
+coordenadas2$I <- rep(0,nrow(coordenadas))
+
+#Rratio <- runif(nrow(coordenadas))
+#coordenadas$ratio <-Rratio
+
+
+tiempo <- c(1:10)
+
+for (i in tiempo){
+
+   
+   #Creamos dos vectores de tamaño N con los desplazamientos
+   a = runif(N,1,10)*2*pi
+   rr = (Radio)*sqrt(runif(N))
+   x1 = rr*cos(a)
+   y1 = rr*sin(a)
+   
+   #Asignamos números aleatorios a cada contagiado.
+   #Rratio <- runif(nrow(coordenadas))
+   #coordenadas$ratio <-Rratio
+   
+   
+   #Checar quienes están infectados
+   
+   inf = subset(coordenadas, Estado == 'infectado')
+   sus = subset(coordenadas, Estado == 'susceptible')
+   recu = subset(coordenadas, Estado == 'recuperado')
+   
+  
+   #Método de contagio
+   for (k in (1:nrow(inf))){
+      x0 <- inf[k,2]
+      y0 <- inf[k,3]
+      for (j in (1:nrow(coordenadas))){
+        t <- distancia_euclidia(coordenadas[j,2],coordenadas[j,3],x0,y0)
+        if(t == TRUE){
+          coordenadas[j,4]='infectado'
+        }
+      }
+   }
+   
+   
+   Rratio <- runif(nrow(inf))
+   inf$ratio <-Rratio
+   
+   #Método de recuperación
+    for (v in (1:nrow(inf))){
+        ratio_t <- inf[v,5]
+       if (ratio_t <= gama){
+         id <- inf[v,1]
+         coordenadas[id,4] = 'recuperado'
+       }
+     }
+   
+   coordenadas$x <- x1
+   coordenadas$y <- y1
+   coordenadas$ratio <- NULL
+   coordenadas$I <- rep(i,nrow(coordenadas))
+   coordenadas2 <- rbind(coordenadas2,coordenadas)
+   coordenadas$I <- NULL
+   }
+```
+
+## Animación
+```{r}
+fig <- coordenadas2 %>%
+  plot_ly(
+    x = ~x, 
+    y = ~y, 
+    color = ~Estado, 
+    frame = ~I, 
+    type = 'scatter',
+    mode = 'markers',
+    text = ~ID, 
+    hoverinfo = "text"
+  )
+fig <- fig %>%
+  animation_opts(
+    1000, easing = "elastic", redraw = FALSE
+  )
+fig
+``` 
+
+## Fase 3: Simulación de la geometría de ciudad y estructura de datos para las personas
+*Problema 3 -A01235878:*
+
+* Crear una ciudad cuadrada de lado D en la que las personas están
+distribuidas en forma de “cluster” en donde hay una preferencia de las
+personas para estar ubicadas en cierta zona dentro de la ciudad. Para esto,
+defina un lugar de preferencia en forma aleatoria x0, y0 y determine la
+posición aleatoria de la posición de N personas distribuidas de acuerdo a
+una distribución normal.
+
+* Considere la función de la distribución normal (en R la función para generar
+números normalmente distribuidos con media 0 y desviación estándar 1 es
+rnorm(N,mean=0,sd=1)). Con esto, puede elegir coordenadas en x que se 
+concentran alrededor de x0 y coordenadas y que se concentran alrededor
+de y0. Considere una desviación estándar de tamaño D/20.
+
+```{r}
+# Cálculo de la distibución de las personas en la ciudad
+N = 300
+D=10
+# Punto aleatorio lugar de preferencia
+x0 <- runif(1, min=1, D-1)
+y0 <- runif(1, min=1, D-1)
+sd=D/20
+# Puntos alrededor del punto aleatorio
+x <- c(rnorm(N,x0,sd))
+y <- c(rnorm(N,y0,sd))
+coordenadas <- data.frame(x,y)
+
+f <- stri_rand_strings(N, 5)
+
+#Grafico de la distibución de las personas en la ciudad
+plot(coordenadas,
+     main = "Distribución de las personas en la ciudad forma Cluster",
+     ylim=c(0,10),
+     xlim=c(0,10),
+     col='red',
+     xlab = "D",
+     ylab = "D")
+```
+Continuación Fase 3:
+```{r}
+# ID diferente a cada persona
+coordenadas <- tibble::rowid_to_column(coordenadas, "ID")
+#Definimos quienes son nuestras variables. Cumpliendo que N = I + S + R. 
+S <- 299
+I <- 1
+R <- 0
+N <- S + R + I
+#Ratio de contagio
+r <- 0.6
+#Ratio de recuperación. USando la propuesta en modelos anteriores.
+gama <- 0.3
+#Creamos la variable categorica de estado. Asignamos la infección de forma al azar. 
+estado <- ifelse(coordenadas$ID == sample(1:N,I),'infectado','susceptible')
+#Indexamos la variable a nuestro dataframe
+coordenadas$Estado <- estado
+#Asignamos a nuestro primer recuperado
+coordenadas[sample(1:N,I),4]='recuperado'
+#Función que calcula si la distancia euclidia entre 2 puntos coordenados (x,y) es    menor que el ratio de contagio r.
+distancia_euclidia <- function(x1,y1,x2,y2){
+  distancia <- sqrt((x2-x1)^2 + (y2-y1)^2)
+  if (distancia <= r){
+    return(TRUE)
+  }else{
+    return(FALSE)
+  }
+}
+
+#Hacemos una copia de las coordenadas iniciales.Iremos concatenando los nuevos datos a este dataframe.
+coordenadas2 <- coordenadas
+coordenadas2$I <- rep(0,nrow(coordenadas))
+```
+
+## Fase 4: Iteración, movimiento y representación gráfica.
+*Problema 3 -A01235878:*
+
+```{r}
+tiempo <- c(1:10)
+x1=x
+y1=y
+for (i in tiempo){
+  # Desplazamiento en la ciudad sin salirse de los límites
+  for (l in 1:N){
+    if ((x1[l]) < 0.5){
+      x1[l]=x1[l]+runif(1, min=0, max=.5)}
+    if((x1[l]) > 9.5){
+      x1[l]=x1[l]-runif(1, min=0, max=.5)}
+    if((x1[l])>0.5 & (x1[i])<9.5){
+      x1[l]=x1[l]+runif(1, min=-.5, max=.5)}
+    if ((y1[l]) < 0.5){
+      y1[l]=y1[l]+runif(1, min=0, max=.5)}
+    if((y1[l]) > 9.5){
+      y1[l]=y1[l]-runif(1, min=0, max=.5)}
+    if((y1[i])>0.5 & (x1[i])<9.5){
+      y1[l]=y1[l]+runif(1, min=-.5, max=.5)}
+  }
+  
+  #Checar quienes están infectados
+  inf = subset(coordenadas, Estado == 'infectado')
+  sus = subset(coordenadas, Estado == 'susceptible')
+  recu = subset(coordenadas, Estado == 'recuperado')
+  #Método de contagio
+  for (k in (1:nrow(inf))){
+    x0 <- inf[k,2]
+    y0 <- inf[k,3]
+    for (j in (1:nrow(coordenadas))){
+      t <- distancia_euclidia(coordenadas[j,2],coordenadas[j,3],x0,y0)
+      if(t == TRUE){
+        coordenadas[j,4]='infectado'
+      }
+    }
+  }
+  Rratio <- runif(nrow(inf))
+  inf$ratio <-Rratio
+  
+  #Método de recuperación
+  for (v in (1:nrow(inf))){
+    ratio_t <- inf[v,5]
+    if (ratio_t <= gama){
+      id <- inf[v,1]
+      coordenadas[id,4] = 'recuperado'
+    }
+  }
+  coordenadas$x <- x1
+  coordenadas$y <- y1
+  coordenadas$ratio <- NULL
+  coordenadas$I <- rep(i,nrow(coordenadas))
+  coordenadas2 <- rbind(coordenadas2,coordenadas)
+  coordenadas$I <- NULL
+}
+fig <- coordenadas2 %>%
+  plot_ly(
+    x = ~x,
+    y = ~y,
+    color = ~Estado, 
+    frame = ~I, 
+    type = 'scatter',
+    mode = 'markers',
+    text = ~ID, 
+    hoverinfo = "text"
+  )
+fig <- fig %>%
+  animation_opts(
+    1000, easing = "elastic", redraw = FALSE
+  )
+fig
+```
+
+```{r setup4, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(stringi)
+library(plotly)
+```
+
+## Fase 3: Simulación de la geometría de ciudad y estructura de datos para las personas
+*Problema 4 -A00828688:*
+
+```{r }
+#Creando ciudad cirucular de radio D/2 con una distribución de personas "Cluster"
+N = 300
+D = 10
+r1 <- sqrt(runif(1,min=1, D))
+t <- 2*pi*runif(1,min=1, D)
+x0 <- r1*cos(t)
+y0 <- r1*sin(t)
+sd=D/20
+x <- c(rnorm(N,x0,sd))
+y <- c(rnorm(N,y0,sd))
+t <- seq(0, 2*pi, length.out = 100)
+#Considerando un arreglo para posiciones X y Y
+coordenadas <- data.frame(x,y)
+xxx <- cos(t)*5
+yyy <- sin(t)*5
+f <- stri_rand_strings(N, 5)
+
+#Graficando la distribución de personas en la ciudad
+plot(coordenadas,
+     main = "Distribución de las personas en la ciudad",
+     ylim=c(-5,5),
+     xlim=c(-5,5),
+     xlab = "D",
+     ylab = "D")
+lines(xxx, yyy, lwd = .5)
+``` 
+
+## Fase 4: Iteración, movimiento y representación gráfica.
+*Problema 4 -A00828688:*
+
+```{r }
+#Variables  para  contar  el  número  inicial  de infectados, de susceptibles y de recuperados. 
+coordenadas <- tibble::rowid_to_column(coordenadas, "ID")
+#Cumpliendo que N = I + S + R. 
+S <- 299
+I <- 1
+R <- 0
+N <- S + R + I
+#variables  para  definir el “radio”  de  infección,  que  representará la distancia para poderse infectar,r=0.6,y para la razón de recuperación.
+r <- 0.6
+gama <- 0.3
+
+#Variable Categorica.  
+estado <- ifelse(coordenadas$ID == sample(1:N,I),'infectado','susceptible')
+#Indexamos la variable a nuestro dataframe.
+coordenadas$Estado <- estado
+#Primer recuperado:
+coordenadas[sample(1:N,I),4]='recuperado'
+
+
+#Cálculo de distancia euclidia
+distancia_euclidia <- function(x1,y1,x2,y2){
+  distancia <- sqrt((x2-x1)^2 + (y2-y1)^2)
+  if (distancia <= r){
+    return(TRUE)
+  }else{
+    return(FALSE)
+  }
+}
+
+#Estructura de datos (dataframe).
+coordenadas2 <- coordenadas
+coordenadas2$I <- rep(0,nrow(coordenadas))
+tiempo <- c(1:10)
+x1=x
+y1=y
+for (i in tiempo){
+  
+  
+  #Límites
+  for (l in 1:N){
+    if ((x1[l]) < .5){
+      x1[l]=x1[l]+runif(1, min=0, max=.5)}
+    if((x1[l]) > 9.5){
+      x1[l]=x1[l]-runif(1, min=0, max=.5)}
+    if((x1[l])>.5 & (x1[i])<9.5){
+      x1[l]=x1[l]+runif(1, min=-0, max=.5)}
+    if ((y1[l]) < .5){
+      y1[l]=y1[l]+runif(1, min=0, max=.5)}
+    if((y1[l]) > 9.5){
+      y1[l]=y1[l]-runif(1, min=0, max=.5)}
+    if((y1[i])>.5 & (x1[i])<9.5){
+      y1[l]=y1[l]+runif(1, min=-0, max=.5)}
+  }
+
+  inf = subset(coordenadas, Estado == 'infectado')
+  sus = subset(coordenadas, Estado == 'susceptible')
+  recu = subset(coordenadas, Estado == 'recuperado')
+  
+  
+  #Método de contagio
+  for (k in (1:nrow(inf))){
+    x0 <- inf[k,2]
+    y0 <- inf[k,3]
+    for (j in (1:nrow(coordenadas))){
+      t <- distancia_euclidia(coordenadas[j,2],coordenadas[j,3],x0,y0)
+      if(t == TRUE){
+        coordenadas[j,4]='infectado'
+      }
+    }
+  }
+  Rratio <- runif(nrow(inf))
+  inf$ratio <-Rratio
+  
+  #Método de recuperación
+  for (v in (1:nrow(inf))){
+    ratio_t <- inf[v,5]
+    if (ratio_t <= gama){
+      id <- inf[v,1]
+      coordenadas[id,4] = 'recuperado'
+    }
+  }
+  
+  coordenadas$x <- x1
+  coordenadas$y <- y1
+  coordenadas$ratio <- NULL
+  coordenadas$I <- rep(i,nrow(coordenadas))
+  coordenadas2 <- rbind(coordenadas2,coordenadas)
+  coordenadas$I <- NULL
+}
+
+fig <- coordenadas2 %>%
+  plot_ly(
+    x = ~x, 
+    y = ~y,
+    color = ~Estado, 
+    frame = ~I, 
+    type = 'scatter',
+    mode = 'markers',
+    text = ~ID, 
+    hoverinfo = "text"
+    
+  )
+fig <- fig %>%
+  animation_opts(
+    1000, easing = "elastic", redraw = FALSE
+  )
+  fig
+```
